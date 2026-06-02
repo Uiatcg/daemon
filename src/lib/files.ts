@@ -1,43 +1,49 @@
-import fs from "fs/promises";
-import path from "path";
+import { execSync } from "child_process";
 
-const root = process.env.DAEMON_FILES_ROOT ?? "/var/lib/ryzenpanel/servers";
+function escapePath(p: string) {
+  return p.replace(/'/g, `'\\''`);
+}
 
-export function resolveSafePath(relativePath: string) {
-  const normalized = path.posix.normalize(`/${relativePath}`);
-  const resolved = path.join(root, normalized);
-  if (!resolved.startsWith(root)) {
-    throw new Error("Invalid file path.");
+export function listFiles(containerId: string, relativePath: string) {
+  const dir = relativePath === "/" ? "/data" : `/data/${escapePath(relativePath.replace(/^\//, ""))}`;
+  const out = execSync(`docker exec "${containerId}" ls -1a "${dir}"`, { encoding: "utf8", timeout: 5000 });
+  const lines = out.trim().split("\n").filter(Boolean);
+  const files: Array<{ name: string; type: string }> = [];
+  for (const name of lines) {
+    if (name === "." || name === "..") continue;
+    const typeOut = execSync(`docker exec "${containerId}" test -d "${dir}/${escapePath(name)}" && echo directory || echo file`, { encoding: "utf8", timeout: 3000 });
+    files.push({ name, type: typeOut.trim() === "directory" ? "directory" : "file" });
   }
-  return resolved;
+  return files;
 }
 
-export async function listFiles(relativePath: string) {
-  const directory = resolveSafePath(relativePath || ".");
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  return entries.map((entry) => ({
-    name: entry.name,
-    type: entry.isDirectory() ? "directory" : "file",
-  }));
+export function readFile(containerId: string, relativePath: string) {
+  const filePath = `/data/${escapePath(relativePath.replace(/^\//, ""))}`;
+  return execSync(`docker exec "${containerId}" cat "${filePath}"`, { encoding: "utf8", timeout: 5000 });
 }
 
-export async function readFile(relativePath: string) {
-  const filePath = resolveSafePath(relativePath);
-  return fs.readFile(filePath, "utf8");
+export function writeFile(containerId: string, relativePath: string, content: string) {
+  const filePath = `/data/${escapePath(relativePath.replace(/^\//, ""))}`;
+  const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+  execSync(`docker exec "${containerId}" mkdir -p "${escapePath(dir)}"`, { encoding: "utf8", timeout: 5000 });
+  const tmp = `/tmp/ryzen_write_${Date.now()}`;
+  require("fs").writeFileSync(tmp, content, "utf8");
+  execSync(`docker cp "${tmp}" "${containerId}:${filePath}"`, { encoding: "utf8", timeout: 10000 });
+  require("fs").unlinkSync(tmp);
 }
 
-export async function writeFile(relativePath: string, content: string) {
-  const filePath = resolveSafePath(relativePath);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, content, "utf8");
+export function deleteFile(containerId: string, relativePath: string) {
+  const filePath = `/data/${escapePath(relativePath.replace(/^\//, ""))}`;
+  execSync(`docker exec "${containerId}" rm -rf "${filePath}"`, { encoding: "utf8", timeout: 10000 });
 }
 
-export async function deleteFile(relativePath: string) {
-  const filePath = resolveSafePath(relativePath);
-  return fs.rm(filePath, { recursive: true, force: true });
+export function makeDirectory(containerId: string, relativePath: string) {
+  const dirPath = `/data/${escapePath(relativePath.replace(/^\//, ""))}`;
+  execSync(`docker exec "${containerId}" mkdir -p "${dirPath}"`, { encoding: "utf8", timeout: 5000 });
 }
 
-export async function makeDirectory(relativePath: string) {
-  const dirPath = resolveSafePath(relativePath);
-  return fs.mkdir(dirPath, { recursive: true });
+export function renameFile(containerId: string, oldPath: string, newPath: string) {
+  const src = `/data/${escapePath(oldPath.replace(/^\//, ""))}`;
+  const dst = `/data/${escapePath(newPath.replace(/^\//, ""))}`;
+  execSync(`docker exec "${containerId}" mv "${src}" "${dst}"`, { encoding: "utf8", timeout: 5000 });
 }
