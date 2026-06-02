@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs/promises";
 import path from "path";
+import { execSync } from "child_process";
 import { createContainer, docker, getContainer } from "../lib/docker";
 import { type ContainerCreatePayload } from "../types/daemon";
 
@@ -67,6 +68,7 @@ export function setupContainerRoutes(app: express.Express) {
             await fs.mkdir(path.dirname(linkDir), { recursive: true });
             try { await fs.unlink(linkDir); } catch {}
             await fs.symlink(dataMount.Source, linkDir);
+            try { execSync(`sudo chown -R codespace:codespace "${dataMount.Source}"`); } catch {}
           }
         } catch (e) {
           console.error("[RYZENPANEL] Failed to symlink volume:", e);
