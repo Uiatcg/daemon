@@ -57,10 +57,11 @@ async function registerWithPanel() {
   const cfgPath = path.join(cfgDir, "daemon.json");
 
   try {
+    const daemonFqdn = process.env.DAEMON_FQDN || host;
     const res = await fetch(`${panelUrl}/api/nodes/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId, nodeToken, daemonKey: apiKey, fqdn: host, daemonPort: port }),
+      body: JSON.stringify({ nodeId, nodeToken, daemonKey: apiKey, fqdn: daemonFqdn, daemonPort: port }),
     });
 
     if (res.ok) {
