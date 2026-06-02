@@ -1,5 +1,6 @@
 // @ts-ignore - dockerode doesn't have types
-import Docker, { type ContainerCreateOptions, type Container } from "dockerode";
+import * as Docker from "dockerode";
+import type { ContainerCreateOptions, Container } from "dockerode";
 
 const socketPath = process.env.DOCKER_SOCKET_PATH ?? "/var/run/docker.sock";
 
