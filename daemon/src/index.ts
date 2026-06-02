@@ -58,10 +58,11 @@ async function registerWithPanel() {
 
   try {
     const daemonFqdn = process.env.DAEMON_FQDN || host;
+    const daemonIp = process.env.DAEMON_IP || daemonFqdn;
     const res = await fetch(`${panelUrl}/api/nodes/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId, nodeToken, daemonKey: apiKey, fqdn: daemonFqdn, daemonPort: port }),
+      body: JSON.stringify({ nodeId, nodeToken, daemonKey: apiKey, fqdn: daemonFqdn, ip: daemonIp, daemonPort: port }),
     });
 
     if (res.ok) {
