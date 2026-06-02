@@ -8,6 +8,7 @@ export interface ContainerCreatePayload {
   cpuLimit?: number;
   memoryLimitMb?: number;
   ioWeight?: number;
+  serverId?: string;
 }
 
 export interface FileWritePayload {

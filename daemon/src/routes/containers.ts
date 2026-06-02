@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs/promises";
+import path from "path";
 import { createContainer, docker, getContainer } from "../lib/docker";
 import { type ContainerCreatePayload } from "../types/daemon";
 
@@ -27,14 +29,22 @@ export function setupContainerRoutes(app: express.Express) {
       }
     }
 
-    const binds = payload.volumes?.map((volume) => `${volume.hostPath}:${volume.containerPath}:${volume.readOnly ? "ro" : "rw"}`) ?? [];
     const hostConfig: any = {
-      Binds: binds,
       PortBindings: Object.keys(portBindings).length > 0 ? portBindings : undefined,
       NanoCPUs: payload.cpuLimit ? Math.floor(payload.cpuLimit * 1e9) : undefined,
       Memory: payload.memoryLimitMb ? payload.memoryLimitMb * 1024 * 1024 : undefined,
       BlkioWeight: payload.ioWeight,
     };
+
+    if (payload.serverId) {
+      hostConfig.Mounts = [
+        {
+          Type: "volume",
+          Source: `ryzenpanel-${payload.serverId}`,
+          Target: "/data",
+        },
+      ];
+    }
 
     try {
       const container = await createContainer({
@@ -46,6 +56,23 @@ export function setupContainerRoutes(app: express.Express) {
         HostConfig: hostConfig,
       });
       await container.start();
+
+      // Symlink so daemon file routes can find data
+      if (payload.serverId) {
+        try {
+          const inspect = await container.inspect();
+          const dataMount = inspect.Mounts?.find((m: any) => m.Destination === "/data");
+          if (dataMount?.Source) {
+            const linkDir = `/var/lib/ryzenpanel/servers/${payload.serverId}`;
+            await fs.mkdir(path.dirname(linkDir), { recursive: true });
+            try { await fs.unlink(linkDir); } catch {}
+            await fs.symlink(dataMount.Source, linkDir);
+          }
+        } catch (e) {
+          console.error("[RYZENPANEL] Failed to symlink volume:", e);
+        }
+      }
+
       return res.status(201).json({ id: container.id });
     } catch (error) {
       return res.status(500).json({ message: (error as Error).message });
