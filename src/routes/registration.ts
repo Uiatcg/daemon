@@ -1,11 +1,15 @@
-import { type Request, type Response, type Express } from "express";
+import { type Request, type Response, type Express, Router } from "express";
 import { createContainer, getContainer, docker, pullImage } from "../lib/docker";
+import { ensureDaemonAuth } from "../lib/auth";
 import path from "path";
 import fs from "fs";
 
 const dataRoot = process.env.DAEMON_DATA_ROOT || "/var/lib/ryzenpanel";
 
 export function setupRegistration(app: Express) {
+  const serverRouter = Router();
+  serverRouter.use(ensureDaemonAuth);
+
   app.post("/api/register", (req: Request, res: Response) => {
     const { nodeId, nodeToken, apiKey } = req.body;
 
@@ -31,7 +35,7 @@ export function setupRegistration(app: Express) {
     return res.json({ success: true, message: "Daemon configured successfully" });
   });
 
-  app.post("/api/servers/create", async (req: Request, res: Response) => {
+  serverRouter.post("/api/servers/create", async (req: Request, res: Response) => {
     try {
       const { serverId, serverUuid, name, image, ram, cpu, disk, portBindings, env, startupCommand } = req.body;
 
@@ -85,7 +89,7 @@ export function setupRegistration(app: Express) {
     }
   });
 
-  app.post("/api/servers/:id/power", async (req: Request, res: Response) => {
+  serverRouter.post("/api/servers/:id/power", async (req: Request, res: Response) => {
     try {
       const { action } = req.body;
       const containerId = req.params.id;
@@ -119,7 +123,7 @@ export function setupRegistration(app: Express) {
     }
   });
 
-  app.post("/api/servers/:id/reinstall", async (req: Request, res: Response) => {
+  serverRouter.post("/api/servers/:id/reinstall", async (req: Request, res: Response) => {
     try {
       const containerId = req.params.id;
       const container = getContainer(containerId);
@@ -129,4 +133,6 @@ export function setupRegistration(app: Express) {
       return res.status(500).json({ message: (error as Error).message });
     }
   });
+
+  app.use(serverRouter);
 }

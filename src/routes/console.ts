@@ -1,10 +1,6 @@
 import { type WebSocketServer, type WebSocket } from "ws";
 import { getContainer, docker } from "../lib/docker";
-
-const apiKey = process.env.DAEMON_API_KEY;
-if (!apiKey) {
-  throw new Error("DAEMON_API_KEY is required for WebSocket authorization.");
-}
+import { getDaemonApiKey } from "../lib/auth";
 
 interface ConsolePayload {
   action: "input";
@@ -18,7 +14,8 @@ export function handleConsoleWebSocket(wss: WebSocketServer) {
       const containerId = url.searchParams.get("containerId");
       const token = url.searchParams.get("token");
 
-      if (!token || token !== apiKey) {
+      const daemonKey = getDaemonApiKey();
+      if (daemonKey && token !== daemonKey) {
         socket.send(JSON.stringify({ error: "Unauthorized console connection." }));
         socket.close();
         return;

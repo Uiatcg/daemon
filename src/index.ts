@@ -1,8 +1,11 @@
+import dotenv from "dotenv";
+import path from "path";
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+
 import express, { type Request, type Response } from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import bodyParser from "body-parser";
-import path from "path";
 import fs from "fs";
 import os from "os";
 import { ensureDaemonAuth } from "./lib/auth";
@@ -69,7 +72,6 @@ async function registerWithPanel() {
       console.log("[RYZENDAEMON] Successfully registered with panel.");
       fs.mkdirSync(cfgDir, { recursive: true });
       fs.writeFileSync(cfgPath, JSON.stringify({ panelUrl, nodeId, nodeToken, apiKey, registeredAt: new Date().toISOString() }, null, 2));
-
       startHeartbeatLoop(panelUrl, nodeId, nodeToken);
     } else {
       const data = await res.json();
@@ -97,7 +99,6 @@ function startHeartbeatLoop(panelUrl: string, nodeId: string, nodeToken: string)
       const totalMem = os.totalmem();
       const freeMem = os.freemem();
       const usedMem = totalMem - freeMem;
-
       const serverStates = getServerStates();
 
       const res = await fetch(`${panelUrl}/api/nodes/heartbeat`, {
@@ -112,9 +113,7 @@ function startHeartbeatLoop(panelUrl: string, nodeId: string, nodeToken: string)
             loadPercent: Math.round((os.loadavg()[0] / cpus.length) * 100),
           },
           memory: {
-            total: totalMem,
-            used: usedMem,
-            free: freeMem,
+            total: totalMem, used: usedMem, free: freeMem,
             percent: Math.round((usedMem / totalMem) * 100),
           },
           disk: { total: 0, used: 0 },
